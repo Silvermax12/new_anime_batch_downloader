@@ -9,6 +9,7 @@ from browser import (
     create_stealth_driver,
     set_adblock,
     guarded_click,
+    cleanup_browser_data,
 )
 
 
@@ -44,7 +45,7 @@ def resolve_download_info(intermediate_url):
     Resolve download information including URL, form data, cookies, and filename.
     Returns a dict with all necessary info for downloading.
     """
-    driver = create_stealth_driver(headless=False)
+    driver = create_stealth_driver(headless=True)
     download_info = {
         'url': None,
         'form_data': {},
@@ -106,7 +107,7 @@ def resolve_download_info(intermediate_url):
             WebDriverWait(driver, 10).until(EC.visibility_of_element_located(title_locator))
             title_element = driver.find_element(*title_locator)
             episode_title = title_element.text.strip()
-            filename = episode_title.replace(" ", "_") + ".mp4"
+            filename = episode_title.replace(" ", "_")
             download_info['filename'] = filename
             print(f"📝 Episode title extracted: {episode_title}")
         except Exception as e:
@@ -165,7 +166,14 @@ def resolve_download_info(intermediate_url):
         print(f"⚠️ Error resolving download info: {e}")
         return None
     finally:
-        driver.quit()
+        try:
+            driver.quit()
+        except Exception:
+            pass
+        try:
+            cleanup_browser_data(driver)
+        except Exception:
+            pass
 
 
 def resolve_download_url(intermediate_url):
