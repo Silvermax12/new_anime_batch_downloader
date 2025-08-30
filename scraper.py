@@ -78,13 +78,10 @@ def scrape_download_links(anime_session, episode_session, max_retries=2):
         finally:
             if driver:
                 try:
+                    cleanup_browser_data(driver)  # Clean up temp directory first
                     driver.quit()
                 except Exception as e:
-                    print(f"⚠️ Error quitting driver: {e}")
-                try:
-                    cleanup_browser_data(driver)
-                except Exception as e:
-                    print(f"⚠️ Error cleaning browser data: {e}")
+                    print(f"⚠️ Error closing driver: {e}")
         
         # Wait before retry
         if attempt < max_retries - 1:
