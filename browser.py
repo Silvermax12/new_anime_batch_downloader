@@ -1,5 +1,8 @@
 import time
 import random
+import uuid
+import tempfile
+import os
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -19,7 +22,16 @@ except Exception:
     HAS_UC = False
 
 
-def create_stealth_driver(headless=False):
+def create_stealth_driver(headless=True):
+    """Create a stealth Chrome driver with unique user data directory to avoid conflicts"""
+    
+    # Create unique user data directory for this browser instance
+    unique_id = str(uuid.uuid4())[:8]
+    temp_dir = tempfile.gettempdir()
+    user_data_dir = os.path.join(temp_dir, f"chrome_user_data_{unique_id}")
+    
+    print(f"🌐 Creating browser instance with unique user data dir: {user_data_dir}")
+    
     if HAS_UC:
         opts = uc.ChromeOptions()
         if headless:
@@ -28,7 +40,31 @@ def create_stealth_driver(headless=False):
         opts.add_argument("--disable-dev-shm-usage")
         opts.add_argument("--disable-blink-features=AutomationControlled")
         opts.add_argument("--window-size=1366,768")
-        driver = uc.Chrome(options=opts)
+        opts.add_argument(f"--user-data-dir={user_data_dir}")
+        opts.add_argument("--disable-gpu")
+        opts.add_argument("--disable-extensions")
+        opts.add_argument("--disable-plugins")
+        opts.add_argument("--disable-images")  # Speed up loading
+        try:
+            driver = uc.Chrome(options=opts)
+        except Exception as e:
+            print(f"⚠️ UC Chrome failed: {e}, falling back to regular Chrome")
+            # Fallback to regular Chrome if UC fails
+            opts = Options()
+            if headless:
+                opts.add_argument("--headless=new")
+            opts.add_argument("--no-sandbox")
+            opts.add_argument("--disable-dev-shm-usage")
+            opts.add_argument("--disable-blink-features=AutomationControlled")
+            opts.add_argument("--window-size=1366,768")
+            opts.add_argument(f"--user-data-dir={user_data_dir}")
+            opts.add_argument("--disable-gpu")
+            opts.add_argument("--disable-extensions")
+            opts.add_argument("--disable-plugins")
+            opts.add_argument("--disable-images")
+            opts.add_experimental_option("excludeSwitches", ["enable-automation"])
+            opts.add_experimental_option("useAutomationExtension", False)
+            driver = webdriver.Chrome(options=opts)
     else:
         opts = Options()
         if headless:
@@ -36,14 +72,24 @@ def create_stealth_driver(headless=False):
         opts.add_argument("--no-sandbox")
         opts.add_argument("--disable-dev-shm-usage")
         opts.add_argument("--disable-blink-features=AutomationControlled")
+        opts.add_argument("--window-size=1366,768")
+        opts.add_argument(f"--user-data-dir={user_data_dir}")
+        opts.add_argument("--disable-gpu")
+        opts.add_argument("--disable-extensions")
+        opts.add_argument("--disable-plugins")
+        opts.add_argument("--disable-images")  # Speed up loading
         opts.add_experimental_option("excludeSwitches", ["enable-automation"])
         opts.add_experimental_option("useAutomationExtension", False)
-        opts.add_argument("--window-size=1366,768")
         driver = webdriver.Chrome(options=opts)
+    
     try:
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     except Exception:
         pass
+    
+    # Store the user data directory path for cleanup
+    driver._user_data_dir = user_data_dir
+    
     return driver
 
 
@@ -69,6 +115,18 @@ def close_new_tabs_and_return(driver, base_handle: str):
     except Exception:
         pass
 
+
+def cleanup_browser_data(driver):
+    """Clean up temporary user data directory after browser closes"""
+    try:
+        if hasattr(driver, '_user_data_dir'):
+            user_data_dir = driver._user_data_dir
+            if os.path.exists(user_data_dir):
+                import shutil
+                shutil.rmtree(user_data_dir, ignore_errors=True)
+                print(f"🧹 Cleaned up browser data directory: {user_data_dir}")
+    except Exception as e:
+        print(f"⚠️ Failed to cleanup browser data: {e}")
 
 def guarded_click(driver, element, max_retries: int = 3):
     base = driver.current_window_handle
