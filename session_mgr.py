@@ -5,7 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from config import BASE_ORIGIN
-from browser import create_stealth_driver
+from browser import create_stealth_driver, cleanup_browser_data
 
 
 def looks_like_ddos_guard(resp: requests.Response) -> bool:
@@ -44,6 +44,7 @@ def get_requests_session_from_selenium():
     print("🌐 Opening Animepahe…")
     wait_for_ddos_clear(driver)
     cookies = driver.get_cookies()
+    cleanup_browser_data(driver)  # Clean up temp directory
     driver.quit()
     sess = requests.Session()
     sess.headers.update({
