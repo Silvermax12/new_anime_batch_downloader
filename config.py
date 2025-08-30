@@ -18,4 +18,10 @@ AD_BLOCK_PATTERNS = [
     "*://loveplumbertailor.com/*",
 ]
 
+# Browser configuration
+BROWSER_MAX_RETRIES = 3
+BROWSER_CREATION_DELAY = 0.5
+BROWSER_CLEANUP_DELAY = 0.5
+BROWSER_RETRY_DELAY = 2
+
 
