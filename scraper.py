@@ -86,8 +86,7 @@ def scrape_download_links(anime_session, episode_session, max_retries=2):
         # Wait before retry
         if attempt < max_retries - 1:
             print(f"⏳ Waiting before retry...")
-            import time
-            time.sleep(2 ** attempt)  # Exponential backoff
+            time.sleep(2 ** attempt + 1)  # Exponential backoff + 1 second minimum
     
     return {}
 
