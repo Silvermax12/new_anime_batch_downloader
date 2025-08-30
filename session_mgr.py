@@ -44,11 +44,8 @@ def get_requests_session_from_selenium():
     print("🌐 Opening Animepahe…")
     wait_for_ddos_clear(driver)
     cookies = driver.get_cookies()
-    try:
-        driver.quit()
-    except Exception:
-        pass
     cleanup_browser_data(driver)  # Clean up temp directory
+    driver.quit()
     sess = requests.Session()
     sess.headers.update({
         "User-Agent": (
@@ -89,5 +86,6 @@ class SessionManager:
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             print(f"🌐 Network error: {type(e).__name__}: {str(e)}")
             raise  # Re-raise the exception for the caller to handle
+
 
 
