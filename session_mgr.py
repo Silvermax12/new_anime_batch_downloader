@@ -71,15 +71,19 @@ class SessionManager:
         self.session = get_requests_session_from_selenium()
 
     def get(self, url, **kwargs):
-        r = self.session.get(url, **kwargs)
-        if looks_like_ddos_guard(r):
-            print("🛑 DDoS page detected. Refreshing…")
-            self.refresh_cookies()
+        try:
             r = self.session.get(url, **kwargs)
-        elif r.status_code == 403:
-            print("🛑 403 Forbidden. Refreshing…")
-            self.refresh_cookies()
-            r = self.session.get(url, **kwargs)
-        return r
+            if looks_like_ddos_guard(r):
+                print("🛑 DDoS page detected. Refreshing…")
+                self.refresh_cookies()
+                r = self.session.get(url, **kwargs)
+            elif r.status_code == 403:
+                print("🛑 403 Forbidden. Refreshing…")
+                self.refresh_cookies()
+                r = self.session.get(url, **kwargs)
+            return r
+        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            print(f"🌐 Network error: {type(e).__name__}: {str(e)}")
+            raise  # Re-raise the exception for the caller to handle
 
 
