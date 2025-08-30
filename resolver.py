@@ -9,7 +9,6 @@ from browser import (
     create_stealth_driver,
     set_adblock,
     guarded_click,
-    cleanup_browser_data,
 )
 
 
@@ -166,14 +165,7 @@ def resolve_download_info(intermediate_url):
         print(f"⚠️ Error resolving download info: {e}")
         return None
     finally:
-        try:
-            driver.quit()
-        except Exception:
-            pass
-        try:
-            cleanup_browser_data(driver)
-        except Exception:
-            pass
+        driver.quit()
 
 
 def resolve_download_url(intermediate_url):
