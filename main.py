@@ -281,8 +281,26 @@ async def download_episodes_background(
             
             print(f"🎬 Processing Episode {episode['episode']}")
             
-            # Get download links
-            links = scrape_download_links(anime_session, episode["session"])
+            # Get download links with retry for browser conflicts
+            links = {}
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    links = scrape_download_links(anime_session, episode["session"])
+                    if links:
+                        break
+                    else:
+                        print(f"⚠️ No links found on attempt {attempt + 1}/{max_attempts}")
+                except Exception as e:
+                    print(f"⚠️ Scraping failed on attempt {attempt + 1}/{max_attempts}: {e}")
+                    if "user data directory" in str(e).lower() or "session not created" in str(e).lower():
+                        print("🔧 Browser conflict detected, retrying with delay...")
+                        import time
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                    if attempt == max_attempts - 1:
+                        print(f"❌ Failed to get download links for episode {episode['episode']} after {max_attempts} attempts")
+                        continue
+            
             raw_url = links.get(f"{quality}_{language}")
             
             if not raw_url:
