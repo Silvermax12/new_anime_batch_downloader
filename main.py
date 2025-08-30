@@ -135,9 +135,14 @@ async def get_episodes_endpoint(request: EpisodesRequest):
 async def get_qualities_endpoint(request: QualityRequest):
     """Get available qualities and languages for a specific episode"""
     try:
+        print(f"🔍 Fetching qualities for anime: {request.anime_session}, episode: {request.episode_session}")
+        
         links = scrape_download_links(request.anime_session, request.episode_session)
         if not links:
-            raise HTTPException(status_code=404, detail="No download links found")
+            raise HTTPException(
+                status_code=404, 
+                detail="No download links found for this episode. The episode may not be available or the site structure may have changed."
+            )
         
         # Parse qualities and languages
         qualities = {}
@@ -149,12 +154,43 @@ async def get_qualities_endpoint(request: QualityRequest):
                 if language not in qualities[quality]:
                     qualities[quality].append(language)
         
+        print(f"✅ Found {len(links)} download links with {len(qualities)} quality options")
         return {
             "available_qualities": qualities,
             "raw_links": links
         }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get qualities: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ Qualities endpoint error: {error_details}")
+        
+        # Provide more user-friendly error messages
+        error_msg = str(e)
+        if "timeout" in error_msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="The episode page took too long to load. This may be due to high traffic or site issues. Please try again later."
+            )
+        elif "selenium" in error_msg.lower() or "webdriver" in error_msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="Browser automation failed. The site structure may have changed or there may be technical issues."
+            )
+        elif "animepahe.ru" in error_msg.lower():
+            raise HTTPException(
+                status_code=503,
+                detail="Cannot access AnimePagehe episode page. The service may be temporarily unavailable."
+            )
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Failed to get episode qualities: {str(e)}"
+            )
 
 @app.post("/download")
 async def start_download_endpoint(request: DownloadRequest, background_tasks: BackgroundTasks):
@@ -195,6 +231,9 @@ async def start_download_endpoint(request: DownloadRequest, background_tasks: Ba
         return {"task_id": task_id, "message": f"Download started for {len(selected_episodes)} episodes"}
     
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ Download endpoint error: {error_details}")
         raise HTTPException(status_code=500, detail=f"Failed to start download: {str(e)}")
 
 @app.get("/download/{task_id}")
