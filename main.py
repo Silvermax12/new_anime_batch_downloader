@@ -19,8 +19,15 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Global session manager
-sm = SessionManager()
+# Global session manager - initialized lazily to avoid startup issues
+sm = None
+
+def get_session_manager():
+    """Get or create session manager"""
+    global sm
+    if sm is None:
+        sm = SessionManager()
+    return sm
 
 # In-memory storage for download tasks (in production, use Redis or database)
 download_tasks = {}
@@ -31,9 +38,14 @@ class SearchRequest(BaseModel):
 class SearchResult(BaseModel):
     title: str
     type: str
-    episodes: str
-    id: str
+    episodes: int
+    id: int
     session: str
+    status: Optional[str] = None
+    season: Optional[str] = None
+    year: Optional[int] = None
+    score: Optional[float] = None
+    poster: Optional[str] = None
 
 class EpisodesRequest(BaseModel):
     anime_session: str
@@ -71,24 +83,52 @@ async def root():
 async def search_anime_endpoint(request: SearchRequest):
     """Search for anime by name"""
     try:
-        results = search_anime(sm, request.query)
+        # Get session manager in a thread-safe way
+        session_manager = get_session_manager()
+        results = search_anime(session_manager, request.query)
         if not results:
-            raise HTTPException(status_code=404, detail="No anime found")
+            raise HTTPException(status_code=404, detail="No anime found for your search query. Try different keywords.")
         
         return [SearchResult(**result) for result in results]
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ Search endpoint error: {error_details}")
+        
+        # Provide more user-friendly error messages
+        error_msg = str(e)
+        if "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+            raise HTTPException(
+                status_code=503, 
+                detail="AnimePagehe service is temporarily unavailable. Please try again later or check your internet connection."
+            )
+        elif "animepahe.ru" in error_msg:
+            raise HTTPException(
+                status_code=503,
+                detail="Cannot connect to AnimePagehe. The service may be down or your connection may be blocked."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @app.post("/episodes", response_model=List[Episode])
 async def get_episodes_endpoint(request: EpisodesRequest):
     """Get all episodes for a specific anime"""
     try:
-        episodes = get_all_episodes(sm, request.anime_session)
+        session_manager = get_session_manager()
+        episodes = get_all_episodes(session_manager, request.anime_session)
         if not episodes:
             raise HTTPException(status_code=404, detail="No episodes found")
         
         return [Episode(**ep) for ep in episodes]
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"❌ Episodes endpoint error: {error_details}")
         raise HTTPException(status_code=500, detail=f"Failed to get episodes: {str(e)}")
 
 @app.post("/qualities")
@@ -124,7 +164,8 @@ async def start_download_endpoint(request: DownloadRequest, background_tasks: Ba
         task_id = str(uuid.uuid4())
         
         # Get episodes for the anime
-        all_episodes = get_all_episodes(sm, request.anime_session)
+        session_manager = get_session_manager()
+        all_episodes = get_all_episodes(session_manager, request.anime_session)
         selected_episodes = [ep for ep in all_episodes if ep["episode"] in request.episodes]
         
         if not selected_episodes:
