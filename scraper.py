@@ -4,7 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from browser import create_stealth_driver, guarded_click
+from browser import create_stealth_driver, guarded_click, cleanup_browser_data
 
 
 def scrape_download_links(anime_session, episode_session, max_retries=2):
@@ -78,6 +78,7 @@ def scrape_download_links(anime_session, episode_session, max_retries=2):
         finally:
             if driver:
                 try:
+                    cleanup_browser_data(driver)  # Clean up temp directory first
                     driver.quit()
                 except Exception as e:
                     print(f"⚠️ Error closing driver: {e}")
